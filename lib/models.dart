@@ -1,7 +1,5 @@
 import 'dart:convert';
 
-import 'app_build.dart';
-
 class SourceSite {
   const SourceSite(this.id, this.name, this.description);
   final String id;
