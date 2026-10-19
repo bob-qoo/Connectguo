@@ -97,10 +97,16 @@ jobs:
       - name: 校验 APK 签名证书
         # Connectguo: fork 未配置签名 Secrets 时跳过校验（此时为预览 APK，configure_signing.py 已说明）；
         # 正式发布请配置 ANDROID_KEYSTORE_* 四个 Secrets，并把 expected 换成自己 keystore 的 SHA256。
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        # 注：secrets 上下文不可用于 step 级 if，改在脚本内判断。
         shell: bash
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
         run: |
           set -euo pipefail
+          if [ -z "${ANDROID_KEYSTORE_BASE64:-}" ]; then
+            echo "未配置签名 Secrets，跳过证书校验（预览 APK）。"
+            exit 0
+          fi
           expected='3fdc07a2297421373607c098f9b847c1377d9266ee07003b9d7fda8c4b581d8a'
           apksigner=$(find "${ANDROID_HOME}/build-tools" -name apksigner -type f 2>/dev/null | sort | tail -n1 || true)
           if [ -z "$apksigner" ]; then
