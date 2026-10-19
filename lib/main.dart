@@ -9,7 +9,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'core_bridge.dart';
-import 'app_build.dart';
 import 'app_layout.dart';
 import 'app_theme.dart';
 import 'home_screen.dart';

@@ -32,7 +32,6 @@ class LocalStore extends ChangeNotifier {
   Future<void> _writes = Future<void>.value();
   List<LocalProfile> _profiles = [];
   String _current = 'default';
-  bool _locked = false;
   bool _disposed = false;
   String? _configurationError;
   int _epoch = 0;
@@ -58,7 +57,6 @@ class LocalStore extends ChangeNotifier {
         _current = _profiles.firstWhere((profile) => profile.admin).id;
       }
       _configurationError = null;
-      _locked = profile.protected;
       _loadLibrary();
     } catch (_) {
       _block('本地用户配置损坏，已锁定访问。原始记录已保留，请重新读取或从备份恢复。');
@@ -85,7 +83,6 @@ class LocalStore extends ChangeNotifier {
 
   void _block(String message) {
     _configurationError = message;
-    _locked = true;
     _profiles = [
       const LocalProfile(id: 'default', name: '配置待恢复', download: false),
     ];
@@ -628,14 +625,12 @@ class LocalStore extends ChangeNotifier {
     await _checkPin(target, pin);
     await _commit({'activeProfile': id});
     _current = id;
-    _locked = false;
     _loadLibrary();
     _epoch++;
     _notify();
   });
   void lock() {
     if (!profile.protected) return;
-    _locked = true;
     _epoch++;
     _notify();
   }
@@ -885,7 +880,6 @@ class LocalStore extends ChangeNotifier {
     _profiles = profiles;
     _current = profiles.firstWhere((profile) => profile.admin).id;
     _configurationError = null;
-    _locked = profile.protected;
     _loadLibrary();
     _epoch++;
     _notify();
@@ -951,14 +945,11 @@ class LocalStore extends ChangeNotifier {
         ? _string('profiles')
         : null;
     final previousId = _current;
-    final previousLocked = locked;
     await preferences.reload();
     _initialize();
-    if (_configurationError == null &&
-        previousProfiles == _string('profiles') &&
-        previousId == _current) {
-      _locked = previousLocked;
-    } else {
+    if (_configurationError != null ||
+        previousProfiles != _string('profiles') ||
+        previousId != _current) {
       _epoch++;
     }
     _notify();
