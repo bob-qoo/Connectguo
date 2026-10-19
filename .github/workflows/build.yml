@@ -95,6 +95,9 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
       - run: python scripts/build_android.py ${{ matrix.arguments }}
       - name: 校验 APK 签名证书
+        # Connectguo: fork 未配置签名 Secrets 时跳过校验（此时为预览 APK，configure_signing.py 已说明）；
+        # 正式发布请配置 ANDROID_KEYSTORE_* 四个 Secrets，并把 expected 换成自己 keystore 的 SHA256。
+        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
         shell: bash
         run: |
           set -euo pipefail
