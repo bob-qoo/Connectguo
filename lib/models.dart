@@ -31,7 +31,8 @@ class SourceSite {
     SourceSite('huangguoai', '黄果 AI', 'AI 短剧'),
     SourceSite('cloudfront', '黄果旧版', '旧 API 剧库'),
   ];
-  static const values = allSourcesEnabled ? knownValues : [hongguo];
+  // Connectguo: 全版本开放全部站源
+  static const values = knownValues;
   static bool isAvailable(String id) => values.any((site) => site.id == id);
   static SourceSite byId(String id) =>
       knownValues.firstWhere((site) => site.id == id, orElse: () => hongguo);

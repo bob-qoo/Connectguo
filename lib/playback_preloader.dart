@@ -61,7 +61,8 @@ class PlaybackPreloader extends ChangeNotifier {
       return;
     }
     final ticket = _generation;
-    _delay = Timer(const Duration(milliseconds: 600), () async {
+    // Connectguo 优化：预加载延迟 600→300ms
+    _delay = Timer(const Duration(milliseconds: 300), () async {
       _delay = null;
       loading = true;
       notifyListeners();

@@ -57,6 +57,9 @@ android {
         }
         release {
             signingConfig = signingConfigs.getByName(if (releaseKey.exists()) "release" else "debug")
+            // Connectguo 优化：R8 压缩 + 资源收缩，减小 APK 体积
+            isMinifyEnabled = true
+            isShrinkResources = true
         }
     }
 

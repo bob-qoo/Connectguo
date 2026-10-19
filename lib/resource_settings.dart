@@ -10,8 +10,8 @@ class ResourceSettings {
   const ResourceSettings({
     this.proxyMode = 'auto',
     this.proxyUrl = '',
-    this.catalogConcurrency = 3,
-    this.catalogIntervalMs = 250,
+    this.catalogConcurrency = 4, // Connectguo 优化：默认并发 3→4
+    this.catalogIntervalMs = 150, // Connectguo 优化：默认间隔 250→150ms
     this.downloadConcurrency = 2,
     this.downloadBySource = false,
     this.warning = '',

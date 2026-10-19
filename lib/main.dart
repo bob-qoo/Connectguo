@@ -9,6 +9,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'core_bridge.dart';
+import 'app_build.dart';
 import 'app_layout.dart';
 import 'app_theme.dart';
 import 'home_screen.dart';
@@ -25,8 +26,20 @@ Future<void> main(List<String> arguments) async {
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     SystemChrome.setSystemUIOverlayStyle(AppTheme.systemBars(Brightness.dark));
   }
-  if (Platform.isWindows) {
+  if (Platform.isWindows || Platform.isMacOS) {
     await windowManager.ensureInitialized();
+    // Connectguo: 桌面端默认横屏大窗口，触发宽屏布局断点（首页 NavigationRail、
+    // 详情分栏、播放器视频+选集分栏）
+    final windowOptions = WindowOptions(
+      size: const Size(1440, 900),
+      minimumSize: const Size(1100, 700),
+      center: true,
+      title: appName,
+    );
+    await windowManager.waitUntilReadyToShow(windowOptions, () async {
+      await windowManager.show();
+      await windowManager.focus();
+    });
   }
   MediaKit.ensureInitialized();
   if (Platform.isWindows && arguments.firstOrNull == '--package-smoke') {
@@ -93,8 +106,13 @@ class _AppBootstrapState extends State<AppBootstrap>
       error = null;
     });
     try {
-      final preferences = await SharedPreferences.getInstance();
-      device = await AppDevice.detect();
+      // Connectguo 优化：无依赖的初始化并行执行，缩短冷启动
+      final results = await Future.wait([
+        SharedPreferences.getInstance(),
+        AppDevice.detect(),
+      ]);
+      final preferences = results[0] as SharedPreferences;
+      device = results[1] as AppDevice;
       await repository.initialize();
       if (mounted) {
         setState(() {
@@ -107,7 +125,7 @@ class _AppBootstrapState extends State<AppBootstrap>
             store!,
             kind: device.television
                 ? 'tv'
-                : Platform.isWindows
+                : (Platform.isWindows || Platform.isMacOS)
                 ? 'computer'
                 : 'phone',
           );

@@ -17,16 +17,12 @@ void main() {
   const denied = Drama(id: 'huangdou:2', source: 'huangdou', title: '受限合成短剧');
 
   test(
-    'profiles require an admin password, isolate records and lock on restart',
+    'Connectguo unrestricted: no lock, all sources and downloads allowed',
     () async {
       SharedPreferences.setMockInitialValues({});
       final prefs = await SharedPreferences.getInstance();
       final store = LocalStore(prefs);
       await store.toggleFavorite(drama);
-      await expectLater(
-        store.saveProfile(name: '访客', sources: ['hongguo'], download: false),
-        throwsStateError,
-      );
       await store.saveProfile(
         id: 'default',
         name: '管理员',
@@ -42,10 +38,14 @@ void main() {
       final visitor = store.profiles.firstWhere((p) => !p.admin);
       await store.switchProfile(visitor.id);
       expect(store.favorites, isEmpty);
-      expect(store.sources.map((s) => s.id), ['hongguo']);
-      expect(store.canDownload, isFalse);
+      // 站源与下载不再受用户档案限制
+      expect(
+        store.sources.map((s) => s.id),
+        SourceSite.values.map((s) => s.id),
+      );
+      expect(store.canDownload, isTrue);
       await store.toggleFavorite(denied);
-      expect(store.favorites, isEmpty);
+      expect(store.favorites.single.id, denied.id);
       await store.toggleFavorite(drama);
       await store.clearHistory();
       await expectLater(
@@ -57,8 +57,11 @@ void main() {
       expect(store.favorites.single.id, drama.id);
       expect(prefs.getString('profiles'), isNot(contains('abcdef12')));
       final restarted = LocalStore(prefs);
-      expect(restarted.locked, isTrue);
-      expect(restarted.sources, isEmpty);
+      expect(restarted.locked, isFalse);
+      expect(
+        restarted.sources.map((s) => s.id),
+        SourceSite.values.map((s) => s.id),
+      );
       await restarted.switchProfile('default', pin: 'abcdef12');
       expect(restarted.canDownload, isTrue);
       store.dispose();
@@ -103,7 +106,7 @@ void main() {
   });
 
   test(
-    'native entry points reject denied sources and downloads before native I/O',
+    'Connectguo unrestricted: permission gates allow every source and download',
     () async {
       SharedPreferences.setMockInitialValues({
         'profiles': jsonEncode([
@@ -126,34 +129,21 @@ void main() {
       });
       final store = LocalStore(await SharedPreferences.getInstance());
       final repository = NativeRepository()..access = store;
-      expect(repository.supportsDownloads, isFalse);
-      for (final request in [
-        () => repository.catalog('huangdou'),
-        () => repository.cached('huangdou'),
-        () => repository.detail(denied),
-        () => repository.cover(denied),
-        () => repository.resolve(denied, Episode({'id': '1'}, 1)),
-        () => repository.enqueueDownloads(DramaDetail(drama, []), [
-          Episode({'id': '1'}, 1),
-        ]),
-        () => repository.localPlayback(drama, Episode({'id': '1'}, 1)),
-      ]) {
-        await expectLater(
-          request(),
-          throwsA(
-            isA<AppFailure>().having(
-              (e) => e.message,
-              'message',
-              anyOf(contains('权限'), contains('版本不包含')),
-            ),
-          ),
-        );
+      expect(store.locked, isFalse);
+      expect(store.canDownload, isTrue);
+      expect(repository.supportsDownloads, isTrue);
+      for (final source in SourceSite.values.map((s) => s.id)) {
+        expect(store.allowsSource(source), isTrue);
       }
+      expect(
+        store.sources.map((s) => s.id),
+        SourceSite.values.map((s) => s.id),
+      );
       store.dispose();
     },
   );
 
-  testWidgets('online-only home hides download navigation and denied sources', (
+  testWidgets('Connectguo unrestricted home shows downloads and all sources', (
     tester,
   ) async {
     SharedPreferences.setMockInitialValues({
@@ -180,10 +170,10 @@ void main() {
       DuanjuApp(repository: FixtureRepository(), store: store),
     );
     await tester.pumpAndSettle();
-    expect(find.text('下载'), findsNothing);
-    expect(find.text('黄豆'), findsNothing);
-    expect(find.text('黄果 AI'), findsNothing);
-    expect(find.text('红果'), findsOneWidget);
+    expect(find.text('下载'), findsWidgets);
+    expect(find.text('黄豆'), findsWidgets);
+    expect(find.text('黄果 AI'), findsWidgets);
+    expect(find.text('红果'), findsWidgets);
     await tester.pumpWidget(const SizedBox.shrink());
     store.dispose();
   });

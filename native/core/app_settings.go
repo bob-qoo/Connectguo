@@ -25,7 +25,7 @@ type nativeResourceSettings struct {
 }
 
 func defaultResourceSettings() nativeResourceSettings {
-	return nativeResourceSettings{ProxyMode: "auto", CatalogConcurrency: 3, CatalogIntervalMS: 250, DownloadConcurrency: 2}
+	return nativeResourceSettings{ProxyMode: "auto", CatalogConcurrency: 4, CatalogIntervalMS: 150, DownloadConcurrency: 2} // Connectguo 优化
 }
 
 func (settings nativeResourceSettings) validate() error {

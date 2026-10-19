@@ -200,7 +200,7 @@ void main() {
       await store.switchProfile('default', pin: 'abcdef12');
       expect(store.playbackPreferences.speed, 1.5);
       final restored = await restart(platform);
-      expect(restored.locked, isTrue);
+      expect(restored.locked, isFalse); // Connectguo: 去除密码锁
       await restored.switchProfile('default', pin: 'abcdef12');
       expect(restored.favorites.length, 2);
       expect(restored.playbackPreferences.autoAdvance, isFalse);

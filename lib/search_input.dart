@@ -68,7 +68,8 @@ class _SearchInputState extends State<SearchInput> {
     final generation = _generation;
     final pending = Completer<Iterable<String>>();
     _pending = pending;
-    _timer = Timer(const Duration(milliseconds: 300), () async {
+    // Connectguo 优化：联想 debounce 300→200ms
+    _timer = Timer(const Duration(milliseconds: 200), () async {
       try {
         final result = (await widget.suggestions!(
           query,

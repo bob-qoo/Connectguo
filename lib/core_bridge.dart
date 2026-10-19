@@ -33,10 +33,17 @@ String _nativeRequest(String body) {
     library = DynamicLibrary.open(
       path.join(path.dirname(Platform.resolvedExecutable), 'duanju_core.dll'),
     );
+  } else if (Platform.isMacOS) {
+    library = DynamicLibrary.open(
+      path.join(
+        path.dirname(Platform.resolvedExecutable),
+        'libduanju_core.dylib',
+      ),
+    );
   } else if (Platform.isIOS) {
     library = DynamicLibrary.process();
   } else {
-    throw UnsupportedError('当前首版支持 Android 手机和 Windows 电脑');
+    throw UnsupportedError('当前版本支持 Android、Windows、macOS 与 iOS');
   }
   final request = library.lookupFunction<_NativeRequest, _DartRequest>(
     'DuanjuRequest',

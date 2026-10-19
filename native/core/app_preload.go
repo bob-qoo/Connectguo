@@ -15,7 +15,7 @@ import (
 
 type nativePreloadKey struct{}
 
-const nativePreloadLimit = 4 << 20
+const nativePreloadLimit = 6 << 20 // Connectguo 优化：预取上限 4MB→6MB
 
 func (engine *nativeEngine) nativePreload(ctx context.Context, input nativeInput) (nativePlan, error) {
 	ctx = context.WithValue(ctx, backgroundCatalogKey{}, true)

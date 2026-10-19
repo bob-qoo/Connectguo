@@ -10,7 +10,6 @@ import 'core_bridge.dart';
 import 'app_theme.dart';
 import 'background_downloads.dart';
 import 'local_store.dart';
-import 'profiles_screen.dart';
 import 'app_build.dart';
 import 'sources_screen.dart';
 import 'widgets.dart';
@@ -173,17 +172,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 subtitle: Text(AppTheme.label(widget.store.themeMode)),
                 trailing: const Icon(Icons.chevron_right_rounded),
                 onTap: _chooseTheme,
-              ),
-              ListTile(
-                leading: const Icon(Icons.people_outline),
-                title: const Text('用户管理'),
-                subtitle: Text('当前：${widget.store.profile.name}'),
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute<void>(
-                    builder: (_) => ProfilesScreen(store: widget.store),
-                  ),
-                ),
               ),
               if (widget.store.canDownload)
                 ListTile(

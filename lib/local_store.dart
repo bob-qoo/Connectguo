@@ -108,11 +108,14 @@ class LocalStore extends ChangeNotifier {
   List<LocalProfile> get profiles => List.unmodifiable(_profiles);
   LocalProfile get profile =>
       _profiles.firstWhere((profile) => profile.id == _current);
-  bool get locked => _locked || _configurationError != null;
+  // Connectguo: 去除密码锁，仅配置损坏时锁定
+  bool get locked => _configurationError != null;
   int get profileEpoch => _epoch;
-  bool get canDownload => !locked && (profile.admin || profile.download);
+  // Connectguo: 下载不受限
+  bool get canDownload => !locked;
   bool allowsSource(String source) =>
-      !locked && SourceSite.isAvailable(source) && profile.allows(source);
+      // Connectguo: 全部站源开放
+      !locked && SourceSite.isAvailable(source);
   List<SourceSite> get sources =>
       SourceSite.values.where((site) => allowsSource(site.id)).toList();
 

@@ -27,13 +27,13 @@ void main() {
       await tester.pumpAndSettle();
       expect(find.text(allSourcesEnabled ? '真果鉴' : '红果鉴'), findsOneWidget);
       expect(appSlug, allSourcesEnabled ? 'zhenguojian' : 'hongguojian');
-      expect(repository.requests, [allSourcesEnabled ? 'huangdou' : 'hongguo']);
-      expect(store.sources.length, allSourcesEnabled ? 5 : 1);
-      for (final source in SourceSite.knownValues.skip(1)) {
-        expect(
-          find.text(source.name),
-          allSourcesEnabled ? findsOneWidget : findsNothing,
-        );
+      // Connectguo: 全版本开放全部站源，保存的站源可直接恢复
+      expect(repository.requests, ['huangdou']);
+      expect(store.sources.length, 6);
+      await tester.tap(find.byKey(const ValueKey('source-switch')));
+      await tester.pumpAndSettle();
+      for (final name in ['全部站源', '红果', '黄豆', '黄剧', '黄果']) {
+        expect(find.text(name), findsWidgets);
       }
       expect(store.preferences.getString('source'), 'huangdou');
       expect(tester.takeException(), isNull);
@@ -61,10 +61,11 @@ void main() {
         'history': jsonEncode(history),
       });
       final store = LocalStore(await SharedPreferences.getInstance());
-      expect(store.favorites.length, allSourcesEnabled ? 2 : 1);
-      expect(store.history.length, allSourcesEnabled ? 2 : 1);
-      expect(store.isFavorite(other.id), allSourcesEnabled);
-      expect(store.watched(other.id) != null, allSourcesEnabled);
+      // Connectguo: 全版本开放全部站源，不过滤
+      expect(store.favorites.length, 2);
+      expect(store.history.length, 2);
+      expect(store.isFavorite(other.id), isTrue);
+      expect(store.watched(other.id) != null, isTrue);
       await store.toggleFavorite(red);
       final backup = await store.exportBackup();
       final library =
@@ -111,10 +112,11 @@ void main() {
       expect(store.profile.id, 'viewer');
       expect(store.profile.admin, isFalse);
       expect(store.profile.sources, ['huangdou']);
-      expect(store.canDownload, isFalse);
-      expect(store.source, allSourcesEnabled ? 'huangdou' : '');
-      expect(store.allowsSource('hongguo'), isFalse);
-      expect(store.allowsSource('huangdou'), allSourcesEnabled);
+      // Connectguo: 用户档案不再限制站源与下载
+      expect(store.canDownload, isTrue);
+      expect(store.source, 'huangdou');
+      expect(store.allowsSource('hongguo'), isTrue);
+      expect(store.allowsSource('huangdou'), isTrue);
       store.dispose();
     },
   );

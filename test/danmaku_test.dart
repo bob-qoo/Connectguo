@@ -380,14 +380,14 @@ void main() {
       await restarted.switchProfile('default', pin: 'synthetic-pin');
       expect(restarted.playbackPreferences.danmaku, isFalse);
       await store.importBackup(backup);
-      expect(store.locked, isTrue);
+      expect(store.locked, isFalse); // Connectguo: 去除密码锁
       await store.switchProfile('default', pin: 'synthetic-pin');
       expect(store.playbackPreferences.danmaku, isFalse);
       final legacy = jsonDecode(backup) as Map<String, dynamic>;
       (((legacy['libraries'] as Map)['default'] as Map)['playback'] as Map)
           .remove('danmaku');
       await store.importBackup(jsonEncode(legacy));
-      expect(store.locked, isTrue);
+      expect(store.locked, isFalse); // Connectguo: 去除密码锁
       await store.switchProfile('default', pin: 'synthetic-pin');
       expect(store.playbackPreferences.danmaku, isTrue);
     },

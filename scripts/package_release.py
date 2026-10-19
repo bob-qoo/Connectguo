@@ -2,6 +2,7 @@ import argparse
 import hashlib
 import re
 import shutil
+import subprocess
 import zipfile
 from pathlib import Path
 
@@ -9,7 +10,7 @@ from app_build import BuildVariant, add_variant_argument
 
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
-parser.add_argument('--platform', choices=['android', 'windows'], required=True)
+parser.add_argument('--platform', choices=['android', 'windows', 'macos'], required=True)
 parser.add_argument('--abi', action='append', choices=['arm64-v8a', 'armeabi-v7a', 'x86_64'])
 add_variant_argument(parser)
 options = parser.parse_args()
@@ -22,7 +23,24 @@ output = root / 'dist' / options.platform
 output.mkdir(parents=True, exist_ok=True)
 artifacts = []
 
-if options.platform == 'android':
+if options.platform == 'macos':
+    import tempfile
+    app = root / 'build' / 'macos' / 'Build' / 'Products' / 'Release' / 'duanju_app.app'
+    dylib = app / 'Contents' / 'MacOS' / 'libduanju_core.dylib'
+    if not app.is_dir():
+        raise SystemExit('缺少 macOS 应用包：' + str(app))
+    if not dylib.is_file():
+        raise SystemExit('macOS 应用包缺少原生库：' + str(dylib))
+    arch = 'arm64'
+    target = output / f'{variant.slug}-{version}-macos-{arch}.zip'
+    with tempfile.TemporaryDirectory(prefix='duanju-macos-') as temporary:
+        staged = Path(temporary) / (variant.slug + '.app')
+        shutil.copytree(app, staged, symlinks=True)
+        subprocess.run(['ditto', '-c', '-k', '--sequesterRsrc', '--keepParent',
+                        str(staged), str(target)], check=True)
+        print('  ' + target.name)
+    artifacts.append(target)
+elif options.platform == 'android':
     for abi in options.abi or ['arm64-v8a', 'armeabi-v7a', 'x86_64']:
         source = root / 'build' / 'app' / 'outputs' / 'flutter-apk' / f'app-{abi}-release.apk'
         if not source.is_file():

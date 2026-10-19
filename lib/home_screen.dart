@@ -21,7 +21,6 @@ import 'remote_widgets.dart';
 import 'widgets.dart';
 import 'vip_icon.dart';
 import 'settings_screen.dart';
-import 'profiles_screen.dart';
 import 'search_input.dart';
 import 'sources_screen.dart';
 import 'batch_download_screen.dart';
@@ -875,13 +874,6 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                         ),
                       );
-                    } else if (value == 'users') {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute<void>(
-                          builder: (_) => ProfilesScreen(store: widget.store),
-                        ),
-                      );
                     } else if (value == 'display') {
                       _chooseDisplayMode();
                     } else if (value == 'about') {
@@ -918,7 +910,6 @@ class _HomeScreenState extends State<HomeScreen> {
                         value: 'sources',
                         child: Text('站源管理'),
                       ),
-                    const PopupMenuItem(value: 'users', child: Text('用户管理')),
                     const PopupMenuItem(
                       value: 'settings',
                       child: Text('设置与备份'),

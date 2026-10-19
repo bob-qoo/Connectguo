@@ -208,8 +208,42 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+  macos:
+    needs: checks
+    runs-on: macos-latest
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - edition: hongguojian
+            arguments: ''
+          - edition: zhenguojian
+            arguments: '--all-sources'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: native/go.mod
+          cache-dependency-path: native/go.sum
+      - uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.47.4'
+          channel: stable
+          cache: true
+      - run: python3 scripts/build_macos.py ${{ matrix.arguments }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.edition }}-macos
+          path: dist/macos/*
+          if-no-files-found: error
+          retention-days: 14
+
   release:
-    needs: [android, ios, windows]
+    needs: [android, ios, windows, macos]
     if: always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.android.result == 'success' && needs.ios.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 20
@@ -258,6 +292,8 @@ jobs:
             printf '%s\n' "- *-ios-unsigned.ipa：未签名 IPA，用 AltStore / Sideloadly / TrollStore 等工具自签后安装"
             printf '\n%s\n' "Windows（解压后运行 hongguojian.exe 或 zhenguojian.exe）："
             printf '%s\n' "- *-windows-x64.zip：Windows 10/11 x64 完整包；构建机没有音频和图形设备，播放自检未通过，未做设备验收"
+            printf '\n%s\n' "macOS（解压后把 .app 拖到应用程序，右键打开绕过 Gatekeeper；Apple Silicon）："
+            printf '%s\n' "- *-macos-arm64.zip：未签名自用包，未做设备验收"
             printf '\n%s\n' "校验：SHA256SUMS.txt"
             printf '%s\n' "签名证书 SHA-256：3F:DC:07:A2:29:74:21:37:36:07:C0:98:F9:B8:47:C1:37:7D:92:66:EE:07:00:3B:9D:7F:DA:8C:4B:58:1D:8A"
           } > notes.md

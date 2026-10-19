@@ -451,7 +451,8 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (duration <= 0 ||
         position < 2000 ||
         (position < duration ~/ 2 && duration - position > 45000) ||
-        state.buffer.inMilliseconds - position < 5000) {
+        state.buffer.inMilliseconds - position < 3000) {
+      // Connectguo 优化：预加载更早触发
       return;
     }
     _preloader.prepare(
@@ -890,7 +891,7 @@ class _PlayerScreenState extends State<PlayerScreen>
       _automaticFullscreenSuppressed = !fullscreen;
     });
     try {
-      if (Platform.isWindows) {
+      if (Platform.isWindows || Platform.isMacOS) {
         await windowManager.setFullScreen(fullscreen);
       } else if (_mobile) {
         if (fullscreen) {
@@ -1144,7 +1145,7 @@ class _PlayerScreenState extends State<PlayerScreen>
         await _player.dispose();
       }),
     );
-    if (Platform.isWindows) {
+    if (Platform.isWindows || Platform.isMacOS) {
       unawaited(windowManager.setFullScreen(false));
     } else if (_mobile) {
       unawaited(

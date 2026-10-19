@@ -6,14 +6,13 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"reflect"
 	"testing"
 	"time"
 )
 
 func TestNativeBuildAuthorization(t *testing.T) {
 	for _, source := range []string{sourceHongguo, sourceHuangdou, sourceHuangguoVideo, sourceHuangguoAI, sourceCloudFront, "unknown"} {
-		allowed := source == sourceHongguo || buildAllSources == "true" && source != "unknown"
+		allowed := source != "unknown" // Connectguo: 全版本开放全部站源
 		for _, action := range []string{"catalog", "cached", "sourceStatus", "sourceJob", "cancelSourceJob", "detail", "cover", "resolve", "enqueueDownloads", "localPlayback"} {
 			input := nativeInput{Action: action, Source: source, Drama: nativeDrama{ID: source + ":123", Source: source}}
 			err := nativeAuthorizeInput(input)
@@ -39,7 +38,7 @@ func TestNativeBuildAuthorization(t *testing.T) {
 	}
 }
 
-func TestNativeBuildPreservesForeignDownloadRecordsAndRestrictsScheduling(t *testing.T) {
+func TestNativeBuildPreservesDownloadRecordsAcrossRestarts(t *testing.T) { // Connectguo: 全版本开放全部站源
 	manager := downloadTestManager(t)
 	records := []*nativeDownloadRecord{}
 	for index, source := range []string{sourceHongguo, sourceHuangdou, sourceHuangguoVideo, sourceHuangguoAI, sourceCloudFront} {
@@ -60,10 +59,7 @@ func TestNativeBuildPreservesForeignDownloadRecordsAndRestrictsScheduling(t *tes
 	reopened := newNativeDownloads(manager.engine)
 	t.Cleanup(reopened.close)
 	jobs, err := reopened.snapshot()
-	expected := 1
-	if buildAllSources == "true" {
-		expected = 5
-	}
+	expected := 5 // Connectguo: 全版本开放全部站源
 	if err != nil || len(jobs) != expected {
 		t.Fatalf("wrong visible downloads: %v, %v", jobs, err)
 	}
@@ -79,10 +75,7 @@ func TestNativeBuildPreservesForeignDownloadRecordsAndRestrictsScheduling(t *tes
 	if err := reopened.control("", "resumeAll"); err != nil {
 		t.Fatal(err)
 	}
-	workers := 1
-	if buildAllSources == "true" {
-		workers = 2
-	}
+	workers := 2 // Connectguo: 全版本开放全部站源
 	seen := map[string]bool{}
 	for index := 0; index < workers; index++ {
 		select {
@@ -92,42 +85,11 @@ func TestNativeBuildPreservesForeignDownloadRecordsAndRestrictsScheduling(t *tes
 			t.Fatal("allowed download did not start")
 		}
 	}
-	if !seen[sourceHongguo] || buildAllSources == "true" && !seen[sourceHuangdou] {
+	if !seen[sourceHongguo] || !seen[sourceHuangdou] { // Connectguo: 全版本开放全部站源
 		t.Fatalf("wrong sources scheduled: %v", seen)
-	}
-	if buildAllSources != "true" {
-		reopened.mu.Lock()
-		active := len(reopened.active)
-		reopened.mu.Unlock()
-		if active != 1 {
-			t.Fatal("foreign-source task was scheduled")
-		}
-		for _, record := range records[1:] {
-			if err := reopened.control(record.ID, "remove"); !errors.Is(err, errNativeBuildSource) {
-				t.Fatalf("foreign task could be removed: %v", err)
-			}
-			if _, _, err := reopened.localPlan(record.Drama.ID, 1); !errors.Is(err, errNativeBuildSource) {
-				t.Fatalf("foreign task could be played: %v", err)
-			}
-		}
 	}
 	if err := reopened.control("", "pauseAll"); err != nil {
 		t.Fatal(err)
 	}
 	reopened.close()
-	if buildAllSources != "true" {
-		for _, original := range records[1:] {
-			if !reflect.DeepEqual(reopened.jobs[original.ID], original) {
-				t.Fatal("hidden download changed during bulk operations")
-			}
-		}
-		stored, err := os.ReadFile(filepath.Join(reopened.root, "index.json"))
-		if err != nil {
-			t.Fatal(err)
-		}
-		var saved []nativeDownloadRecord
-		if err := json.Unmarshal(stored, &saved); err != nil || len(saved) != 5 {
-			t.Fatalf("saved hidden downloads lost: %v", err)
-		}
-	}
 }

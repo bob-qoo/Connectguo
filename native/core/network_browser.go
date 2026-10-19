@@ -60,7 +60,7 @@ func (transport *huangguoBrowserTransport) createClient(proxy string) (browserHT
 		tlsclient.WithProxyUrl(proxy),
 		tlsclient.WithCookieJar(tlsclient.NewCookieJar()),
 		tlsclient.WithTransportOptions(&tlsclient.TransportOptions{
-			IdleConnTimeout: &idleTimeout, MaxIdleConns: 8, MaxIdleConnsPerHost: 4,
+			IdleConnTimeout: &idleTimeout, MaxIdleConns: 16, MaxIdleConnsPerHost: 6, // Connectguo 优化
 			MaxResponseHeaderBytes: 1 << 20,
 		}),
 	}
