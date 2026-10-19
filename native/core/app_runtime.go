@@ -54,6 +54,9 @@ type Downloader struct {
 	hongguo               *hongguoAppClient
 	huangjuOnce           sync.Once
 	huangju               *huangjuAPIClient
+	yeguoOnce             sync.Once
+	yeguo                 *yeguoAPIClient
+	dsdCatalog            dsdCatalogState
 	diagnostics           *diagnosticLog
 	apiMu                 sync.Mutex
 	apiBase               string
@@ -168,6 +171,7 @@ type nativeEngine struct {
 	sourceRecords    map[string]nativeSourceRecord
 	sourceCatalogMu  sync.Mutex
 	sourceCatalogs   map[string]chan struct{}
+	customRegistry   *customMaccmsRegistry
 }
 
 var nativeState struct {
