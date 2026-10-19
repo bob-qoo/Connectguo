@@ -30,7 +30,8 @@ void main() {
         ),
       );
       await tester.enterText(find.byType(TextField), '永');
-      await tester.pump(const Duration(milliseconds: 199)); // Connectguo: debounce 300→200ms
+      // Connectguo: debounce 300→200ms
+      await tester.pump(const Duration(milliseconds: 199));
       expect(calls, isEmpty);
       await tester.pump(const Duration(milliseconds: 1));
       expect(calls, ['永']);
