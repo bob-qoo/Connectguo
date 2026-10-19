@@ -1169,6 +1169,37 @@ func mapString(m map[string]any, keys ...string) string {
 	return ""
 }
 
+// mapInt 从 map 里取某个键的整数值（兼容 json.Number/float64/int/字符串数字），
+// 取不到返回 0。供红果等网页数据里的数字字段（如 accessible_episode_cnt、height）使用。
+func mapInt(m map[string]any, keys ...string) int {
+	for _, key := range keys {
+		v, ok := m[key]
+		if !ok {
+			continue
+		}
+		switch x := v.(type) {
+		case json.Number:
+			if n, err := x.Int64(); err == nil {
+				return int(n)
+			}
+			if f, err := x.Float64(); err == nil {
+				return int(f)
+			}
+		case float64:
+			return int(x)
+		case int:
+			return x
+		case int64:
+			return int(x)
+		case string:
+			if n, err := strconv.Atoi(strings.TrimSpace(x)); err == nil {
+				return n
+			}
+		}
+	}
+	return 0
+}
+
 func mapStringSlice(m map[string]any, keys ...string) []string {
 	seen := map[string]bool{}
 	var out []string

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"html"
 	"net/url"
 	"regexp"
 	"slices"
@@ -198,15 +199,18 @@ func (d *Downloader) resolveHongguoMedia(ctx context.Context, task Task) (provid
 	if !hongguoNumericID.MatchString(videoID) || !hongguoNumericID.MatchString(seriesID) {
 		return providerMedia{}, fmt.Errorf("红果章节 ID 无效，请重新获取章节")
 	}
-	media, nativeErr := d.resolveHongguoAppMedia(ctx, videoID)
-	if nativeErr == nil {
+	// 取流顺序：网页（免费试看范围内的明文 MP4）→ App CENC（试看范围外的加密集）→ 备用接口。
+	// 网页取流内部有 accessible_episode_cnt 闸门：免费集直接命中明文直链，付费集返回"超出试看范围"
+	// 错误，自动落到 App 取流，天然实现"前几集走网页、后面走 App"。
+	media, pageErr := d.resolveHongguoWebMedia(ctx, seriesID, videoID)
+	if pageErr == nil {
 		return media, nil
 	}
 	if err := ctx.Err(); err != nil {
 		return providerMedia{}, err
 	}
-	media, pageErr := d.resolveHongguoWebMedia(ctx, seriesID, videoID)
-	if pageErr == nil {
+	media, nativeErr := d.resolveHongguoAppMedia(ctx, videoID)
+	if nativeErr == nil {
 		return media, nil
 	}
 	if err := ctx.Err(); err != nil {
@@ -216,32 +220,137 @@ func (d *Downloader) resolveHongguoMedia(ctx context.Context, task Task) (provid
 	if apiErr == nil {
 		return media, nil
 	}
-	return providerMedia{}, fmt.Errorf("红果 App 取流失败：%v；网页取流失败：%v；备用取流失败：%w", publicError(nativeErr), publicError(pageErr), apiErr)
+	return providerMedia{}, fmt.Errorf("红果网页取流失败：%v；App 取流失败：%v；备用取流失败：%w", publicError(pageErr), publicError(nativeErr), apiErr)
 }
 
+// resolveHongguoWebMedia 用官网 player 页取【免费试看范围】内的明文 MP4 直链。
+//
+// 网页版对普通用户只开放前 N 集（N=accessible_episode_cnt）的完整片源，且是
+// 未加密的 MP4（无需 spade_a 密钥），适合「前几集」直接下载。超出该范围的集
+// 网页只给试看片段，绝不能冒充正片——这类集请走 App CENC 取流。
+//
+// 直链不再藏在 _ROUTER_DATA 的 video_player_info（该字段已废弃），而是写在
+// <script type="application/ld+json"> 的 VideoObject.contentUrl 里。
 func (d *Downloader) resolveHongguoWebMedia(ctx context.Context, seriesID, videoID string) (providerMedia, error) {
 	pageURL := hongguoBaseURL + "/player/" + url.PathEscape(seriesID) + "/" + url.PathEscape(videoID)
 	body, err := d.fetchProviderText(ctx, pageURL, hongguoBaseURL+"/")
 	if err != nil {
 		return providerMedia{}, err
 	}
-	page := routerLoaderMap(parseRouterData(body), "player_", "player_page")
+	page := hongguoPlayerPage(parseRouterData(body))
+	if len(page) == 0 {
+		return providerMedia{}, errors.New("红果网页未返回目录数据")
+	}
 	if mapString(page, "vid") != videoID || mapString(page, "series_id") != seriesID {
-		return providerMedia{}, fmt.Errorf("红果未返回所请求的剧集，可能仅允许网页试看；请在站点确认该集的访问权限")
+		return providerMedia{}, fmt.Errorf("红果未返回所请求的剧集，可能仅允许网页试看")
 	}
-	info, _ := page["video_player_info"].(map[string]any)
-	addresses := hongguoMediaAddresses(info)
+	// 免费试看闸门：本集下标若超出 accessible_episode_cnt，网页只有试看片段，不冒充正片。
+	detail, _ := page["seriesDetail"].(map[string]any)
+	if limit := mapInt(detail, "accessible_episode_cnt"); limit > 0 {
+		if index := hongguoEpisodeIndex(anyList(detail["vid_list"]), videoID); index > limit {
+			return providerMedia{}, fmt.Errorf("红果第 %d 集超出网页免费试看范围，请改用 App 取流", index)
+		}
+	}
+	addresses := hongguoWebPublicAddresses(body, videoID)
 	if len(addresses) == 0 {
-		return providerMedia{}, fmt.Errorf("红果该集未提供公开播放地址，可能需要登录或 App 授权；不会将试看集冒充该集下载")
+		return providerMedia{}, errors.New("红果该集未提供公开播放地址，请改用 App 取流")
 	}
-	duration, _ := strconv.ParseFloat(mapString(info, "duration"), 64)
-	media := providerMedia{URL: addresses[0], Referer: d.providerBaseURL(sourceHongguo) + "/", Duration: time.Duration(duration * float64(time.Second))}
-	for _, address := range addresses {
-		variant := media
-		variant.URL, variant.Variants = address, nil
-		media.Variants = append(media.Variants, variant)
+	seo, _ := page["publicVideoSeo"].(map[string]any)
+	duration, _ := strconv.ParseFloat(mapString(seo, "durationSeconds", "duration"), 64)
+	height := mapInt(seo, "height")
+	media := providerMedia{URL: addresses[0], Referer: d.providerBaseURL(sourceHongguo) + "/", Duration: time.Duration(duration * float64(time.Second)), Quality: height}
+	for _, address := range addresses[1:] {
+		media.Variants = append(media.Variants, providerMedia{URL: address, Referer: media.Referer, Duration: media.Duration, Quality: height})
 	}
 	return media, nil
+}
+
+// hongguoPlayerPage 取 player 页的 loaderData（形如 player_(series_id)/(vid)/page）。
+// 优先选以 /page 结尾的那条（含 vid/series_id/publicVideoSeo），避免误取 layout。
+func hongguoPlayerPage(data map[string]any) map[string]any {
+	loader, _ := data["loaderData"].(map[string]any)
+	if loader == nil {
+		return nil
+	}
+	var fallback map[string]any
+	for key, value := range loader {
+		page, _ := value.(map[string]any)
+		if len(page) == 0 || !strings.HasPrefix(key, "player_") {
+			continue
+		}
+		if strings.HasSuffix(key, "/page") {
+			return page
+		}
+		if fallback == nil {
+			fallback = page
+		}
+	}
+	return fallback
+}
+
+// hongguoEpisodeIndex 返回 videoID 在 vid_list 里的 1 基下标；找不到为 0。
+func hongguoEpisodeIndex(vidList []any, videoID string) int {
+	for i, v := range vidList {
+		if strings.TrimSpace(fmt.Sprint(v)) == videoID {
+			return i + 1
+		}
+	}
+	return 0
+}
+
+// hongguoLDJSONPattern 匹配 <script type="application/ld+json"> 的内容体。
+var hongguoLDJSONPattern = regexp.MustCompile(`<script\b[^>]*type\s*=\s*["']application/ld\+json["'][^>]*>([\s\S]*?)</script>`)
+
+// hongguoWebPublicAddresses 从 player 页 HTML 的 ld+json VideoObject 里取指向本集的
+// 公开 MP4 直链（/video/public/<vid>/xxx.mp4）。只收确实绑定本 vid 的直链，避免误抓
+// 页面上推荐位/试看位的其它视频地址。
+func hongguoWebPublicAddresses(body, videoID string) []string {
+	var out []string
+	seen := map[string]bool{}
+	for _, match := range hongguoLDJSONPattern.FindAllStringSubmatch(body, -1) {
+		rawJSON := match[1]
+		node, err := parseLDJSONObject(rawJSON)
+		if err != nil || fmt.Sprint(node["@type"]) != "VideoObject" {
+			continue
+		}
+		// 内容必须确实指向本集：公开直链形如 /video/public/<vid>/360p.mp4。
+		raw := strings.TrimSpace(fmt.Sprint(node["contentUrl"]))
+		if raw == "" || raw == "<nil>" || !strings.Contains(raw, "/video/public/"+videoID+"/") {
+			continue
+		}
+		address := hongguoNormalizeWebURL(raw)
+		if address != "" && !seen[address] {
+			seen[address] = true
+			out = append(out, address)
+		}
+	}
+	return out
+}
+
+// parseLDJSONObject 解析 ld+json 内容：先按纯 JSON 解析，失败再按 HTML 实体反转义后重试。
+func parseLDJSONObject(raw string) (map[string]any, error) {
+	decoded := strings.TrimSpace(raw)
+	var node map[string]any
+	if err := json.Unmarshal([]byte(decoded), &node); err == nil {
+		return node, nil
+	}
+	decoded = html.UnescapeString(strings.TrimSpace(raw))
+	var retry map[string]any
+	if err := json.Unmarshal([]byte(decoded), &retry); err != nil {
+		return nil, err
+	}
+	return retry, nil
+}
+
+// hongguoNormalizeWebURL 去掉 JS 转义（\u002F、\u0026、&amp;）与 Range 头，
+// 让 CDN 回完整片而非分段。
+func hongguoNormalizeWebURL(raw string) string {
+	s := strings.TrimSpace(raw)
+	s = strings.ReplaceAll(s, `\u002F`, "/")
+	s = strings.ReplaceAll(s, `\u0026`, "&")
+	s = strings.ReplaceAll(s, "&amp;", "&")
+	s = regexp.MustCompile(`([?&])Range=[^&]*`).ReplaceAllString(s, "$1")
+	return strings.TrimRight(s, "?&")
 }
 
 func hongguoDramaFromAny(v any, category string) Drama {

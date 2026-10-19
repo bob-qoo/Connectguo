@@ -12,28 +12,70 @@ import (
 	"time"
 )
 
+// resolveHongguoAppMedia 取单集 CENC 片源（第 4 集及以后 / 网页试看范围外的集用这条）。
+//
+// 单集端点 /novel/player/video_model/v1/ 已失效（服务端对普通请求直接返回 0 字节空响应），
+// 改用批量端点 /novel/player/multi_video_model/preload/v1：
+// 一次提交 mixed_video_id_map.1004=[vid]，从 data[vid].video_model（JSON 字符串）取出
+// 分片模型，再交给既有的 selectHongguoAppMedia 选流 + 解 spade_a 密钥。
 func (downloader *Downloader) resolveHongguoAppMedia(ctx context.Context, videoID string) (providerMedia, error) {
 	if !hongguoNumericID.MatchString(videoID) {
 		return providerMedia{}, errors.New("红果视频 ID 无效")
 	}
 	payload := map[string]any{
-		"video_id": videoID, "content_type": 1,
-		"biz_param": map[string]any{"need_all_video_definition": true, "video_platform": 3},
+		"biz_param": map[string]any{
+			"detail_page_version": 0, "device_level": 3, "disable_digg_stat": false,
+			"need_all_video_definition": true, "need_mp4_align": false,
+			"use_os_player": false, "use_server_dns": false, "video_platform": 1024,
+		},
+		"dr_scene": "preload",
+		"mixed_video_id_map": map[string]any{"1004": []string{videoID}},
 	}
-	result, err := downloader.hongguoAppRequest(ctx, http.MethodPost, "/novel/player/video_model/v1/", nil, payload)
+	result, err := downloader.hongguoAppRequest(ctx, http.MethodPost, "/novel/player/multi_video_model/preload/v1", nil, payload)
 	if err != nil {
 		return providerMedia{}, err
 	}
 	data := nestedMap(result, "data")
-	model, _ := data["video_model"].(map[string]any)
-	if encoded, ok := data["video_model"].(string); ok {
-		decoder := json.NewDecoder(strings.NewReader(encoded))
-		decoder.UseNumber()
-		if err := decoder.Decode(&model); err != nil {
-			return providerMedia{}, errors.New("红果 App 播放信息格式异常")
+	if data == nil {
+		return providerMedia{}, errors.New("红果 App 批量取流接口未返回数据")
+	}
+	entry, _ := data[videoID].(map[string]any)
+	if len(entry) == 0 {
+		// 批量接口的 data 形如 {vid: {...}}；个别情况下外层可能再套一层，兜底取第一个。
+		for _, value := range data {
+			if item, ok := value.(map[string]any); ok && nestedMap(item, "video_model") != nil {
+				entry = item
+				break
+			}
 		}
 	}
+	model := parseHongguoAppModel(entry)
+	if len(model) == 0 {
+		return providerMedia{}, errors.New("红果 App 批量取流接口未返回本集片源模型")
+	}
 	return selectHongguoAppMedia(model)
+}
+
+// parseHongguoAppModel 把批量端点 data[vid].video_model 还原成模型 map。
+// video_model 通常是内嵌的 JSON 字符串；个别实现可能直接是对象。两种都兼容。
+func parseHongguoAppModel(entry map[string]any) map[string]any {
+	if entry == nil {
+		return nil
+	}
+	if model, ok := entry["video_model"].(map[string]any); ok {
+		return model
+	}
+	encoded, ok := entry["video_model"].(string)
+	if !ok {
+		return nil
+	}
+	decoder := json.NewDecoder(strings.NewReader(encoded))
+	decoder.UseNumber()
+	var model map[string]any
+	if err := decoder.Decode(&model); err != nil {
+		return nil
+	}
+	return model
 }
 
 func selectHongguoAppMedia(model map[string]any) (providerMedia, error) {
