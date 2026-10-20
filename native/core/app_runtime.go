@@ -97,6 +97,10 @@ type nativeInput struct {
 	Action           string                  `json:"action"`
 	Directory        string                  `json:"directory"`
 	Source           string                  `json:"source"`
+	Name             string                  `json:"name"`
+	Base             string                  `json:"base"`
+	Rule             string                  `json:"rule"`
+	Content          string                  `json:"content"`
 	Page             int                     `json:"page"`
 	Query            string                  `json:"query"`
 	Category         string                  `json:"category"`
@@ -165,6 +169,7 @@ type nativeEngine struct {
 	sourceRecords    map[string]nativeSourceRecord
 	sourceCatalogMu  sync.Mutex
 	sourceCatalogs   map[string]chan struct{}
+	customRegistry   *customMaccmsRegistry
 }
 
 var nativeState struct {
@@ -249,7 +254,9 @@ func newNativeEngine(directory string) (*nativeEngine, error) {
 	d := &Downloader{cfg: cfg, providerHosts: map[string]string{}, proxyRouter: router,
 		limiter: newRequestLimiter(3, 250*time.Millisecond), diagnostics: newDiagnosticLog(directory)}
 	transport := http.DefaultTransport.(*http.Transport).Clone()
-	transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12}
+	// RootCAs 设为「系统信任库 + 打包 CA 全集」。Android 端 Go 不加载系统信任库，
+	// 打包 CA 在此提供信任锚（含 Certum 等小众公共根），修复媒体请求的证书校验失败。
+	transport.TLSClientConfig = &tls.Config{MinVersion: tls.VersionTLS12, RootCAs: systemCertPoolWithBundle()}
 	transport.MaxIdleConnsPerHost = 8
 	transport.ResponseHeaderTimeout = 20 * time.Second
 	transport.Proxy = router.proxy
@@ -268,6 +275,10 @@ func newNativeEngine(directory string) (*nativeEngine, error) {
 	engine.loadResourceSettings()
 	d.loadRankingCache()
 	engine.loadCatalogCache()
+	// 自定义源注册表必须先于 sources.json 加载：
+	// loadSourceRecords 里的 isHuangguoProviderSource 要能认出 custom:<hash> 记录才不会丢任务状态。
+	engine.customRegistry = newCustomMaccmsRegistry(directory)
+	engine.customRegistry.load()
 	engine.loadSourceRecords()
 	engine.covers = newNativeCoverCache(directory, d)
 	engine.downloads = newNativeDownloads(engine)
@@ -442,6 +453,43 @@ func nativeDispatch(input nativeInput) (any, error) {
 		return engine.startSourceTask(input.Source, input.Command, input.Drama)
 	case "cancelSourceJob":
 		return engine.cancelSourceTask(input.Source), nil
+	case "customSources":
+		return map[string]any{"items": engine.customMaccmsSources()}, nil
+	case "addCustomSource":
+		record, err := engine.addCustomMaccmsSource(input.Name, input.Base, input.Rule)
+		if err != nil {
+			return nil, err
+		}
+		return record, nil
+	case "updateCustomSource":
+		record, err := engine.updateCustomMaccmsSource(input.Source, input.Name, input.Base, input.Rule)
+		if err != nil {
+			return nil, err
+		}
+		return record, nil
+	case "removeCustomSource":
+		return true, engine.removeCustomMaccmsSource(input.Source)
+	case "exportCustomSources":
+		content, err := engine.exportCustomMaccmsSources()
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"content": content, "filename": customSourceExportFilename()}, nil
+	case "importCustomSources":
+		if strings.TrimSpace(input.Content) == "" {
+			return nil, errors.New("导入内容为空")
+		}
+		result, err := engine.importCustomMaccmsSources(input.Content)
+		if err != nil {
+			return nil, err
+		}
+		return result, nil
+	case "resetCustomSources":
+		removed, err := engine.resetCustomMaccmsSources()
+		if err != nil {
+			return nil, err
+		}
+		return map[string]any{"removed": removed}, nil
 	case "cover":
 		return engine.loadCover(ctx, input.Drama, input.Force)
 	case "prepareCover":
@@ -526,6 +574,16 @@ func (engine *nativeEngine) nativeCatalog(ctx context.Context, input nativeInput
 		result.HasMore = more
 		return result, nil
 	}
+	if query != "" && isDuanjuProviderSource(source) {
+		items, err := d.searchDuanju(ctx, source, query)
+		if err != nil {
+			return result, err
+		}
+		for _, drama := range items {
+			result.Items = append(result.Items, nativeNormalize(drama))
+		}
+		return result, nil
+	}
 	if query != "" {
 		engine.mu.Lock()
 		items := append([]nativeDrama{}, engine.catalogs[source]...)
@@ -607,11 +665,15 @@ func (engine *nativeEngine) nativeCatalog(ctx context.Context, input nativeInput
 		result.HasMore = len(items) >= 20
 	case sourceCloudFront:
 		items, result.HasMore, err = d.fetchLegacyCatalogCategoryPage(ctx, page, category)
+	default:
+		if isDuanjuProviderSource(source) {
+			items, result.HasMore, err = d.fetchDuanjuCatalogPage(ctx, source, page, category)
+		}
 	}
 	if err != nil && len(items) == 0 {
 		return result, err
 	}
-	if len(items) == 0 && page == 1 && source != sourceHuangju {
+	if len(items) == 0 && page == 1 && source != sourceHuangju && !isDuanjuProviderSource(source) {
 		return result, errors.New("站源暂未返回剧集，请稍后刷新")
 	}
 	if err != nil {
@@ -648,6 +710,10 @@ func (engine *nativeEngine) nativeDetail(ctx context.Context, drama nativeDrama)
 	case sourceHuangju:
 		raw, chapters, err = engine.downloader.fetchHuangjuDetail(ctx, sourceID)
 	default:
+		if isDuanjuProviderSource(source) {
+			raw, chapters, err = engine.downloader.fetchDuanjuDetail(ctx, source, sourceID)
+			break
+		}
 		title, chapters, err = engine.downloader.GetHuangguoChapters(ctx, source, sourceID)
 	}
 	if err != nil {

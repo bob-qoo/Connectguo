@@ -1,11 +1,42 @@
 import 'dart:convert';
 
+/// 用户自定义的 MacCMS / XBPQ 站源记录。
+class CustomSourceSite {
+  const CustomSourceSite({
+    required this.id,
+    required this.name,
+    required this.base,
+    this.rule = '',
+  });
+  final String id;
+  final String name;
+  final String base;
+  final String rule;
+
+  factory CustomSourceSite.fromJson(Map<String, dynamic> json) =>
+      CustomSourceSite(
+        id: json['id'] as String? ?? '',
+        name: json['name'] as String? ?? '',
+        base: json['base'] as String? ?? '',
+        rule: json['rule'] as String? ?? '',
+      );
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'name': name,
+    'base': base,
+    if (rule.isNotEmpty) 'rule': rule,
+  };
+  bool get isCustom => SourceSite.isCustomId(id);
+  bool get hasRule => rule.trim().isNotEmpty;
+  SourceSite get asSourceSite => SourceSite(id, name, base);
+}
+
 class SourceSite {
   const SourceSite(this.id, this.name, this.description);
   final String id;
   final String name;
   final String description;
-  bool get onlineSearch => id == 'hongguo' || id == 'huangju';
+  bool get onlineSearch => id == 'hongguo' || id == 'huangju' || isCustomId(id);
   bool get pagedSearch => id == 'huangju';
   bool get searchSuggestions => id == 'hongguo';
   String get groupId => switch (id) {
@@ -31,9 +62,26 @@ class SourceSite {
   ];
   // Connectguo: 全版本开放全部站源
   static const values = knownValues;
-  static bool isAvailable(String id) => values.any((site) => site.id == id);
-  static SourceSite byId(String id) =>
-      knownValues.firstWhere((site) => site.id == id, orElse: () => hongguo);
+
+  /// 当前会话已注册的自定义源 ID，供可用性判断与站源归一化使用。
+  static final Set<String> customIds = {};
+  static bool isCustomId(String id) => id.startsWith('custom:');
+  static bool isAvailable(String id) =>
+      values.any((site) => site.id == id) || customIds.contains(id);
+  static SourceSite byId(String id) {
+    if (customIds.contains(id)) {
+      return SourceSite(id, customName(id), '自定义站源');
+    }
+    return knownValues.firstWhere(
+      (site) => site.id == id,
+      orElse: () => hongguo,
+    );
+  }
+
+  static String customName(String id) {
+    if (id.startsWith('custom:')) return '自定义源';
+    return id;
+  }
 }
 
 class SourceGroup {

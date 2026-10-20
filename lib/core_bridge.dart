@@ -131,6 +131,34 @@ abstract class AppRepository {
   }) async => throw AppFailure('当前环境不支持站源管理');
   Future<SourceStatus> cancelSourceJob(String source) async =>
       throw AppFailure('当前环境不支持站源管理');
+  Future<List<CustomSourceSite>> customSources() async => const [];
+  Future<CustomSourceSite> addCustomSource({
+    required String name,
+    required String base,
+    String rule = '',
+  }) async => throw AppFailure('当前环境不支持自定义源');
+  Future<CustomSourceSite> updateCustomSource(
+    String id, {
+    required String name,
+    required String base,
+    String rule = '',
+  }) async => throw AppFailure('当前环境不支持自定义源');
+  Future<void> removeCustomSource(String id) async =>
+      throw AppFailure('当前环境不支持自定义源');
+
+  /// 导出全部自定义源为 JSON 文本（含 XBPQ 规则原文）。
+  Future<String> exportCustomSources() async =>
+      throw AppFailure('当前环境不支持自定义源');
+
+  /// 导入自定义源文本，返回 {added, updated, skipped, failed} 计数与原因。
+  /// content 既可以是本地 JSON/TXT 文本，也可以是一行远程配置地址，
+  /// 原生核心会自动识别并抓取。
+  Future<Map<String, dynamic>> importCustomSources(String content) async =>
+      throw AppFailure('当前环境不支持自定义源');
+
+  /// 恢复默认：删除全部自定义源，仅保留内置源。返回删除数量。
+  Future<int> resetCustomSources() async =>
+      throw AppFailure('当前环境不支持自定义源');
   Future<List<String>> suggestions(String query) async => const [];
   Future<Map<String, dynamic>> storage() async => {};
   Future<String> downloadDirectory() async =>
@@ -437,6 +465,80 @@ class NativeRepository extends AppRepository {
       SourceStatus.fromJson(
         await _call({'action': 'cancelSourceJob', 'source': source}),
       );
+
+  @override
+  Future<List<CustomSourceSite>> customSources() async {
+    _adminPermission();
+    final result = await _call({'action': 'customSources'});
+    return [
+      for (final row in result['items'] as List? ?? const [])
+        CustomSourceSite.fromJson(Map<String, dynamic>.from(row as Map)),
+    ];
+  }
+
+  @override
+  Future<CustomSourceSite> addCustomSource({
+    required String name,
+    required String base,
+    String rule = '',
+  }) async {
+    _adminPermission();
+    final result = await _call({
+      'action': 'addCustomSource',
+      'name': name,
+      'base': base,
+      'rule': rule,
+    });
+    return CustomSourceSite.fromJson(Map<String, dynamic>.from(result as Map));
+  }
+
+  @override
+  Future<CustomSourceSite> updateCustomSource(
+    String id, {
+    required String name,
+    required String base,
+    String rule = '',
+  }) async {
+    _adminPermission();
+    final result = await _call({
+      'action': 'updateCustomSource',
+      'source': id,
+      'name': name,
+      'base': base,
+      'rule': rule,
+    });
+    return CustomSourceSite.fromJson(Map<String, dynamic>.from(result as Map));
+  }
+
+  @override
+  Future<void> removeCustomSource(String id) async {
+    _adminPermission();
+    await _call({'action': 'removeCustomSource', 'source': id});
+  }
+
+  @override
+  Future<String> exportCustomSources() async {
+    _adminPermission();
+    final result = await _call({'action': 'exportCustomSources'});
+    return (result as Map)['content'] as String? ?? '';
+  }
+
+  @override
+  Future<Map<String, dynamic>> importCustomSources(String content) async {
+    _adminPermission();
+    final result = await _call({
+      'action': 'importCustomSources',
+      'content': content,
+    });
+    return Map<String, dynamic>.from(result as Map);
+  }
+
+  @override
+  Future<int> resetCustomSources() async {
+    _adminPermission();
+    final result = await _call({'action': 'resetCustomSources'});
+    return (result as Map)['removed'] as int? ?? 0;
+  }
 
   void _authorize(String source, {bool download = false}) {
     if (!SourceSite.isAvailable(source)) {

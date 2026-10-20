@@ -62,6 +62,9 @@ func (transport *huangguoBrowserTransport) createClient(proxy string) (browserHT
 		tlsclient.WithTransportOptions(&tlsclient.TransportOptions{
 			IdleConnTimeout: &idleTimeout, MaxIdleConns: 16, MaxIdleConnsPerHost: 6, // Connectguo 优化
 			MaxResponseHeaderBytes: 1 << 20,
+			// Android 端纯 Go 不加载系统信任库：显式挂「系统信任库 + 打包 CA 全集」，
+			// 与标准传输保持一致的信任锚，避免站点目录/播放请求握手失败。
+			RootCAs: systemCertPoolWithBundle(),
 		}),
 	}
 	if transport.insecure {

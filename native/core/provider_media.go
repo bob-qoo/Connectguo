@@ -36,6 +36,9 @@ func (d *Downloader) providerBaseURL(source string) string {
 	case sourceHuangju:
 		configured, fallback = d.cfg.HuangjuURL, huangjuBaseURL
 	default:
+		if spec, found := duanjuSourceSpecFor(source); found {
+			return d.duanjuBaseURL(spec.ID)
+		}
 		fallback = "https://d2pypzndaqisk.cloudfront.net"
 	}
 	return strings.TrimRight(firstNonEmpty(configured, fallback), "/")
@@ -65,7 +68,7 @@ func providerSourceForURL(raw string) string {
 
 func (d *Downloader) providerURLCandidates(raw string) []string {
 	source := providerSourceForURL(raw)
-	if source == "" || source == sourceHuangju {
+	if source == "" || source == sourceHuangju || isDuanjuProviderSource(source) {
 		return []string{raw}
 	}
 	parsed, _ := url.Parse(raw)
@@ -103,6 +106,9 @@ func (d *Downloader) resolveProviderMedia(ctx context.Context, task Task) (provi
 	}
 	if chapter.Source == sourceHuangju {
 		return d.resolveHuangjuMedia(ctx, task)
+	}
+	if isDuanjuProviderSource(chapter.Source) {
+		return d.resolveDuanjuMedia(ctx, task)
 	}
 	if strings.HasPrefix(chapter.VideoURL, "hongguo-cenc://") {
 		return d.resolveHongguoMedia(ctx, task)

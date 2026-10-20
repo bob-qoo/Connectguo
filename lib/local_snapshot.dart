@@ -31,6 +31,9 @@ class LocalSnapshot {
     'themeMode',
     'autoExport',
     'exportPosters',
+    // 自定义源是设备级配置，所有本地用户共用，必须在受管字段内，
+    // 否则保存自定义源会被判为"无效的本地配置字段"。
+    'customSources',
   };
   final SharedPreferences preferences;
   Map<String, Object> _values = {};

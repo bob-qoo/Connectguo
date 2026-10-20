@@ -37,10 +37,14 @@ class LocalStore extends ChangeNotifier {
   int _epoch = 0;
   int _failures = 0;
   DateTime _retryAfter = DateTime(2000);
+  List<CustomSourceSite> _customSources = [];
 
   void _initialize() {
     try {
       _snapshot = LocalSnapshot(preferences);
+      // 先恢复自定义源：资料库加载时按站源可用性过滤历史/收藏，
+      // SourceSite.customIds 必须已经就绪，否则自定义源的记录会被误判无效。
+      _loadCustomSources();
       final raw = _snapshot!.getString('profiles');
       if (raw == null &&
           (_snapshot!.getString('activeProfile') != null ||
@@ -113,8 +117,59 @@ class LocalStore extends ChangeNotifier {
   bool allowsSource(String source) =>
       // Connectguo: 全部站源开放
       !locked && SourceSite.isAvailable(source);
-  List<SourceSite> get sources =>
-      SourceSite.values.where((site) => allowsSource(site.id)).toList();
+  List<SourceSite> get sources => [
+    ...SourceSite.values.where((site) => allowsSource(site.id)),
+    ..._customSources
+        .where((site) => allowsSource(site.id))
+        .map((site) => site.asSourceSite),
+  ];
+
+  List<CustomSourceSite> get customSources => List.unmodifiable(_customSources);
+
+  void _loadCustomSources() {
+    try {
+      _customSources = [
+        for (final row in readJsonList(_string('customSources')))
+          CustomSourceSite.fromJson(row),
+      ];
+    } catch (_) {
+      _customSources = [];
+    }
+    _syncCustomIds();
+  }
+
+  void _syncCustomIds() {
+    SourceSite.customIds
+      ..clear()
+      ..addAll(_customSources.map((site) => site.id));
+  }
+
+  /// 将设备端已保存的自定义源替换为最新结果并持久化。
+  Future<void> syncCustomSources(List<CustomSourceSite> sources) async {
+    final epoch = _epoch;
+    await _queue(() async {
+      if (locked || epoch != _epoch) return;
+      final sorted = List<CustomSourceSite>.of(sources)..sort((a, b) {
+        final la = a.name.toLowerCase(), lb = b.name.toLowerCase();
+        return la.compareTo(lb);
+      });
+      final serialized = jsonEncode(
+        sorted.map((site) => site.toJson()).toList(),
+      );
+      if (serialized == _string('customSources')) {
+        _customSources = sorted;
+        _syncCustomIds();
+        return;
+      }
+      await _commit({'customSources': serialized});
+      _customSources = sorted;
+      _syncCustomIds();
+      _notify();
+    });
+  }
+
+  Future<void> persistCustomSources(List<CustomSourceSite> sources) =>
+      syncCustomSources(sources);
 
   void _loadLibrary() {
     _lanDocumentCache = null;
