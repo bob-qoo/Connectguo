@@ -24,15 +24,9 @@ class CustomSourceImportPreset {
   final String url;
 }
 
-/// 内置预设：默认直接使用该远程配置，无需用户手输长地址。
+/// 内置预设：Connectguo 不预置任何第三方远程配置，用户自行填入地址导入。
 const List<CustomSourceImportPreset> customSourceImportPresets =
-    <CustomSourceImportPreset>[
-  CustomSourceImportPreset(
-    '默认配置',
-    'https://cfkua.wokaotianshi.eu.org/https://raw.githubusercontent.com/'
-        'wokaotianshi123/wokaotianshi123.github.io/refs/heads/main/hongguo/config.json',
-  ),
-];
+    <CustomSourceImportPreset>[];
 
 /// 电视（Android TV 遥控器）焦点模式下的输入框方向键处理器。
 ///
