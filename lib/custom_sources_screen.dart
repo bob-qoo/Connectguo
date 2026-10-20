@@ -135,7 +135,8 @@ class _CustomSourcesScreenState extends State<CustomSourcesScreen> {
       final content = await widget.repository.exportCustomSources();
       if (content.isEmpty) throw const FormatException('没有可导出的自定义源');
       final saved = await FilePicker.saveFile(
-        fileName: 'duanju-custom-sources-'
+        fileName:
+            'duanju-custom-sources-'
             '${DateTime.now().toIso8601String().substring(0, 10)}.json',
         bytes: Uint8List.fromList(utf8.encode(content)),
         mimeType: 'application/json',
@@ -289,15 +290,12 @@ class _CustomSourcesScreenState extends State<CustomSourcesScreen> {
     );
     if (confirmed != true || !mounted) return;
     try {
-      await saveUserChange(
-        context,
-        () async {
-          await widget.repository.removeCustomSource(source.id);
-          await widget.store.syncCustomSources(
-            await widget.repository.customSources(),
-          );
-        },
-      );
+      await saveUserChange(context, () async {
+        await widget.repository.removeCustomSource(source.id);
+        await widget.store.syncCustomSources(
+          await widget.repository.customSources(),
+        );
+      });
       if (mounted) unawaited(_load());
     } catch (_) {}
   }
@@ -362,7 +360,8 @@ class _CustomSourcesScreenState extends State<CustomSourcesScreen> {
               if (sources.isEmpty) {
                 return const StatusPanel(
                   title: '还没有自定义源',
-                  message: '点击「新增」填入 MacCMS 站点地址或粘贴 XBPQ 爬虫规则；也可以「导入文件」批量添加，「导出 JSON」备份迁移。',
+                  message:
+                      '点击「新增」填入 MacCMS 站点地址或粘贴 XBPQ 爬虫规则；也可以「导入文件」批量添加，「导出 JSON」备份迁移。',
                 );
               }
               return ListView(
@@ -390,12 +389,8 @@ class _CustomSourcesScreenState extends State<CustomSourcesScreen> {
       key: ValueKey('custom-${source.id}'),
       margin: const EdgeInsets.only(bottom: 12),
       child: ListTile(
-        leading: Icon(
-          source.hasRule ? Icons.code_rounded : Icons.dns_outlined,
-        ),
-        title: Text(
-          source.name + (source.hasRule ? '（规则）' : ''),
-        ),
+        leading: Icon(source.hasRule ? Icons.code_rounded : Icons.dns_outlined),
+        title: Text(source.name + (source.hasRule ? '（规则）' : '')),
         subtitle: Text(
           source.base,
           maxLines: 1,
@@ -579,9 +574,9 @@ class _CustomSourceEditorState extends State<_CustomSourceEditor> {
                     minLines: 4,
                     keyboardType: TextInputType.multiline,
                     autocorrect: false,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          fontFamily: 'monospace',
-                        ),
+                    style: Theme.of(
+                      context,
+                    ).textTheme.bodySmall?.copyWith(fontFamily: 'monospace'),
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       hintText:
@@ -635,8 +630,9 @@ class _CustomSourceImportDialogState extends State<_CustomSourceImportDialog> {
         ? ''
         : customSourceImportPresets.first.url,
   );
-  final FocusNode _urlNode =
-      _tvFieldNode(debugLabel: 'custom-source-import-url');
+  final FocusNode _urlNode = _tvFieldNode(
+    debugLabel: 'custom-source-import-url',
+  );
   bool _fileMode = true;
 
   /// 选中某个预设地址：填入输入框并把光标移到末尾，仍可继续手动编辑。
@@ -681,9 +677,7 @@ class _CustomSourceImportDialogState extends State<_CustomSourceImportDialog> {
       if (mounted) {
         ScaffoldMessenger.of(context)
           ..hideCurrentSnackBar()
-          ..showSnackBar(
-            const SnackBar(content: Text('导入文件不是有效的 UTF-8 文本')),
-          );
+          ..showSnackBar(const SnackBar(content: Text('导入文件不是有效的 UTF-8 文本')));
       }
     }
   }

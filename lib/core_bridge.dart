@@ -147,8 +147,7 @@ abstract class AppRepository {
       throw AppFailure('当前环境不支持自定义源');
 
   /// 导出全部自定义源为 JSON 文本（含 XBPQ 规则原文）。
-  Future<String> exportCustomSources() async =>
-      throw AppFailure('当前环境不支持自定义源');
+  Future<String> exportCustomSources() async => throw AppFailure('当前环境不支持自定义源');
 
   /// 导入自定义源文本，返回 {added, updated, skipped, failed} 计数与原因。
   /// content 既可以是本地 JSON/TXT 文本，也可以是一行远程配置地址，
@@ -157,8 +156,7 @@ abstract class AppRepository {
       throw AppFailure('当前环境不支持自定义源');
 
   /// 恢复默认：删除全部自定义源，仅保留内置源。返回删除数量。
-  Future<int> resetCustomSources() async =>
-      throw AppFailure('当前环境不支持自定义源');
+  Future<int> resetCustomSources() async => throw AppFailure('当前环境不支持自定义源');
   Future<List<String>> suggestions(String query) async => const [];
   Future<Map<String, dynamic>> storage() async => {};
   Future<String> downloadDirectory() async =>

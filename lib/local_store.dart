@@ -149,10 +149,11 @@ class LocalStore extends ChangeNotifier {
     final epoch = _epoch;
     await _queue(() async {
       if (locked || epoch != _epoch) return;
-      final sorted = List<CustomSourceSite>.of(sources)..sort((a, b) {
-        final la = a.name.toLowerCase(), lb = b.name.toLowerCase();
-        return la.compareTo(lb);
-      });
+      final sorted = List<CustomSourceSite>.of(sources)
+        ..sort((a, b) {
+          final la = a.name.toLowerCase(), lb = b.name.toLowerCase();
+          return la.compareTo(lb);
+        });
       final serialized = jsonEncode(
         sorted.map((site) => site.toJson()).toList(),
       );
