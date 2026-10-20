@@ -1,7 +1,18 @@
 import 'package:flutter/material.dart';
 
+import 'app_layout.dart';
 import 'search_input.dart';
 import 'package:flutter/services.dart';
+
+void ensureTelevisionFocus(BuildContext context) {
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    if (!context.mounted) return;
+    if (!AppLayout.isTelevision(context)) return;
+    final scope = FocusScope.of(context);
+    if (scope.hasFocus) return;
+    scope.nextFocus();
+  });
+}
 
 class RemoteTarget extends StatefulWidget {
   const RemoteTarget({
