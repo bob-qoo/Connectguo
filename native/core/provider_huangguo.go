@@ -26,8 +26,6 @@ const (
 	sourceHongguo       = "hongguo"
 	sourceHuangju       = "huangju"
 	sourceCloudFront    = "cloudfront"
-	sourceYeguo         = "yeguo"
-	sourceDSD           = "dsd"
 
 	providerMaxBodyBytes = 20 * 1024 * 1024
 	providerTimeout      = 12 * time.Second
@@ -88,10 +86,10 @@ func splitProviderDramaID(id string) (source, sourceID string, ok bool) {
 
 func isHuangguoProviderSource(source string) bool {
 	switch canonicalProviderSource(source) {
-	case sourceHuangguoAI, sourceHuangguoVideo, sourceHuangdou, sourceHongguo, sourceHuangju, sourceYeguo, sourceDSD, sourceCloudFront:
+	case sourceHuangguoAI, sourceHuangguoVideo, sourceHuangdou, sourceHongguo, sourceHuangju, sourceCloudFront:
 		return true
 	default:
-		return isDuanjuProviderSource(source)
+		return false
 	}
 }
 
@@ -107,16 +105,9 @@ func canonicalProviderSource(source string) string {
 		return sourceHongguo
 	case "huangju", "huangju.net", "api.huangju.net":
 		return sourceHuangju
-	case "yeguo", "ygdj7.com", "www.ygdj7.com", "analyze.buxefaex.cc", "delta.ygrwdsgt.cc", "yeguodj.com", "www.yeguodj.com":
-		return sourceYeguo
-	case "dsd", "dsd.com.se", "www.dsd.com.se":
-		return sourceDSD
 	case "cloudfront":
 		return sourceCloudFront
 	default:
-		if canonical, found := duanjuSourceAliases[strings.ToLower(strings.TrimSpace(source))]; found {
-			return canonical
-		}
 		return strings.TrimSpace(source)
 	}
 }
@@ -219,19 +210,9 @@ func (d *Downloader) GetHuangguoChapters(ctx context.Context, source, sourceID s
 	case sourceHuangju:
 		drama, chapters, err := d.fetchHuangjuDetail(ctx, sourceID)
 		return drama.DisplayTitle(), chapters, err
-	case sourceYeguo:
-		drama, chapters, err := d.fetchYeguoDetail(ctx, sourceID)
-		return drama.DisplayTitle(), chapters, err
-	case sourceDSD:
-		drama, chapters, err := d.fetchDSDDetail(ctx, sourceID)
-		return drama.DisplayTitle(), chapters, err
 	case sourceCloudFront:
 		return d.fetchLegacyChapters(ctx, sourceID)
 	default:
-		if isDuanjuProviderSource(source) {
-			drama, chapters, err := d.fetchDuanjuDetail(ctx, source, sourceID)
-			return drama.DisplayTitle(), chapters, err
-		}
 		return "", nil, fmt.Errorf("unsupported provider source: %s", source)
 	}
 }
