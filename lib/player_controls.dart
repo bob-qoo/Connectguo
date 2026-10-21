@@ -393,6 +393,27 @@ class _PlayerControlsState extends State<PlayerControls> {
                                         ),
                                       ),
                                       if (!widget.swipeEnabled)
+                                        SizedBox(
+                                          width: 100,
+                                          child: Slider(
+                                            value: state.volume,
+                                            min: 0,
+                                            max: 100,
+                                            divisions: 20,
+                                            label: '${state.volume.round()}%',
+                                            onChanged: widget.enabled
+                                                ? (value) {
+                                                    _show();
+                                                    unawaited(
+                                                      widget.player.setVolume(
+                                                        value,
+                                                      ),
+                                                    );
+                                                  }
+                                                : null,
+                                          ),
+                                        ),
+                                      if (!widget.swipeEnabled)
                                         IconButton(
                                           tooltip: state.volume == 0
                                               ? '取消静音'

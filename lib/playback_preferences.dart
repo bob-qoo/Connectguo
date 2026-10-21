@@ -5,8 +5,9 @@ class PlaybackPreferences {
     this.speed = 1,
     this.quality = 0,
     this.autoAdvance = true,
-    this.danmaku = true,
+    this.danmaku = false,
     this.preload = true,
+    this.backgroundPlayback = false,
   });
 
   final double speed;
@@ -14,6 +15,7 @@ class PlaybackPreferences {
   final bool autoAdvance;
   final bool danmaku;
   final bool preload;
+  final bool backgroundPlayback;
 
   PlaybackPreferences copyWith({
     double? speed,
@@ -21,12 +23,14 @@ class PlaybackPreferences {
     bool? autoAdvance,
     bool? danmaku,
     bool? preload,
+    bool? backgroundPlayback,
   }) => PlaybackPreferences(
     speed: speed ?? this.speed,
     quality: quality ?? this.quality,
     autoAdvance: autoAdvance ?? this.autoAdvance,
     danmaku: danmaku ?? this.danmaku,
     preload: preload ?? this.preload,
+    backgroundPlayback: backgroundPlayback ?? this.backgroundPlayback,
   );
 
   Map<String, dynamic> toJson() => {
@@ -35,14 +39,16 @@ class PlaybackPreferences {
     'autoAdvance': autoAdvance,
     'danmaku': danmaku,
     'preload': preload,
+    'backgroundPlayback': backgroundPlayback,
   };
 
   factory PlaybackPreferences.fromJson(Map<String, dynamic> value) {
     final speed = (value['speed'] as num? ?? 1).toDouble();
     final quality = value['quality'] as int? ?? 0;
     final autoAdvance = value['autoAdvance'] as bool? ?? true;
-    final danmaku = value['danmaku'] as bool? ?? true;
+    final danmaku = value['danmaku'] as bool? ?? false;
     final preload = value['preload'] as bool? ?? true;
+    final backgroundPlayback = value['backgroundPlayback'] as bool? ?? false;
     if (!playbackSpeeds.contains(speed) || quality < 0 || quality > 4320) {
       throw const FormatException('播放偏好无效');
     }
@@ -52,6 +58,7 @@ class PlaybackPreferences {
       autoAdvance: autoAdvance,
       danmaku: danmaku,
       preload: preload,
+      backgroundPlayback: backgroundPlayback,
     );
   }
 }

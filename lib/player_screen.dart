@@ -69,7 +69,7 @@ class _PlayerScreenState extends State<PlayerScreen>
   bool _preloadEnabled = true;
   late final DanmakuController _danmaku;
   int _seekSequence = 0;
-  bool _danmakuEnabled = true;
+  bool _danmakuEnabled = false;
   late final PlayerInteractions _interactions;
   final _playerFocus = FocusNode(debugLabel: 'player-surface');
   final _videoPaneKey = GlobalKey();
@@ -519,9 +519,11 @@ class _PlayerScreenState extends State<PlayerScreen>
     if (!_foreground) _interactions.cancel();
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
-      _playIntent = false;
-      _player.pause();
       _saveProgress(flush: true);
+      if (!widget.store.playbackPreferences.backgroundPlayback) {
+        _playIntent = false;
+        _player.pause();
+      }
     }
     if (_foreground && _pendingError) {
       _queueRecovery();
