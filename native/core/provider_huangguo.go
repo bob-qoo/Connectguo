@@ -76,7 +76,22 @@ func providerChapterID(source, sourceID, chapterKey string) string {
 }
 
 func splitProviderDramaID(id string) (source, sourceID string, ok bool) {
-	source, sourceID, ok = strings.Cut(strings.TrimSpace(id), ":")
+	id = strings.TrimSpace(id)
+	if rest, found := strings.CutPrefix(id, customSourcePrefix); found {
+		// 自定义源 ID 自带 "custom:" 前缀，形如 custom:<hash>:<sourceID>；
+		// 不能按首个冒号切分，否则源会被截成裸 "custom"，注册表查不到，
+		// 导致全部自定义源的详情/分集/播放解析失败（目录本身不受影响）。
+		hash, sid, found := strings.Cut(rest, ":")
+		if !found || hash == "" || strings.TrimSpace(sid) == "" {
+			return "", "", false
+		}
+		source = customSourcePrefix + hash
+		if !isHuangguoProviderSource(source) {
+			return "", "", false
+		}
+		return source, strings.TrimSpace(sid), true
+	}
+	source, sourceID, ok = strings.Cut(id, ":")
 	source = canonicalProviderSource(source)
 	if !ok || strings.TrimSpace(sourceID) == "" || !isHuangguoProviderSource(source) {
 		return "", "", false
