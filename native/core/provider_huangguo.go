@@ -100,11 +100,21 @@ func splitProviderDramaID(id string) (source, sourceID string, ok bool) {
 }
 
 func isHuangguoProviderSource(source string) bool {
+	if isBuiltinProviderSource(source) {
+		return true
+	}
+	return isDuanjuProviderSource(source)
+}
+
+// isBuiltinProviderSource 只认内置站源，不查自定义源注册表（不拿全局快照锁），
+// 供引擎创建阶段（如 loadSourceRecords）在快照尚未就绪时使用：在 initialize
+// 全程占着 nativeState 锁的情况下，任何快照查询都会自己锁自己致死锁。
+func isBuiltinProviderSource(source string) bool {
 	switch canonicalProviderSource(source) {
 	case sourceHuangguoAI, sourceHuangguoVideo, sourceHuangdou, sourceHongguo, sourceHuangju, sourceCloudFront:
 		return true
 	default:
-		return isDuanjuProviderSource(source)
+		return false
 	}
 }
 

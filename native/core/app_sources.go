@@ -87,7 +87,11 @@ func (engine *nativeEngine) loadSourceRecords() {
 		return
 	}
 	for source, record := range records {
-		if !isHuangguoProviderSource(source) && !engine.isCustomMaccmsSourceKnown(source) {
+		// 注意：此处不能调 isHuangguoProviderSource——它经注册表快照拿
+		// nativeState 锁，而 loadSourceRecords 跑在 initialize 的持锁区内，
+		// sources.json 里一旦有自定义源记录就会自己锁自己致启动死锁。
+		// 内置源用无锁判断，自定义源走本实例注册表（已先于本函数加载）。
+		if !isBuiltinProviderSource(source) && !engine.isCustomMaccmsSourceKnown(source) {
 			continue
 		}
 		if record.Running {
