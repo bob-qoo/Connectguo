@@ -59,6 +59,11 @@ type Downloader struct {
 	legacy                *legacyAPIClient
 	previewMu             sync.Mutex
 	previewSessions       map[string]*huangguoPreviewSession
+	xjai1Mu               sync.Mutex
+	xjai1DeviceID         string
+	xjai1Access           string
+	xjai1Refresh          string
+	xjai1AccessExpires    time.Time
 }
 
 func defaultConfig() Config { return Config{MaxPagesPerSort: 1, PageSize: 30, Retries: 2} }
@@ -665,6 +670,8 @@ func (engine *nativeEngine) nativeCatalog(ctx context.Context, input nativeInput
 		result.HasMore = len(items) >= 20
 	case sourceCloudFront:
 		items, result.HasMore, err = d.fetchLegacyCatalogCategoryPage(ctx, page, category)
+	case sourceXjai1:
+		items, result.HasMore, err = d.fetchXjai1CatalogPage(ctx, page, category)
 	default:
 		if isDuanjuProviderSource(source) {
 			items, result.HasMore, err = d.fetchDuanjuCatalogPage(ctx, source, page, category)
@@ -709,6 +716,8 @@ func (engine *nativeEngine) nativeDetail(ctx context.Context, drama nativeDrama)
 		raw, chapters, err = engine.downloader.fetchLegacyDetail(ctx, sourceID)
 	case sourceHuangju:
 		raw, chapters, err = engine.downloader.fetchHuangjuDetail(ctx, sourceID)
+	case sourceXjai1:
+		raw, chapters, err = engine.downloader.fetchXjai1Detail(ctx, sourceID)
 	default:
 		if isDuanjuProviderSource(source) {
 			raw, chapters, err = engine.downloader.fetchDuanjuDetail(ctx, source, sourceID)

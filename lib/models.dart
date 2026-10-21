@@ -59,6 +59,7 @@ class SourceSite {
     SourceSite('huangguo-video', '黄果视频', '视频剧集'),
     SourceSite('huangguoai', '黄果 AI', 'AI 短剧'),
     SourceSite('cloudfront', '黄果旧版', '旧 API 剧库'),
+    SourceSite('xjai1', '香蕉短剧', '免费短剧 · 题材分类'),
   ];
   // Connectguo: 全版本开放全部站源
   static const values = knownValues;

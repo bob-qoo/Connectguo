@@ -64,6 +64,8 @@ func validNativeCategory(source, category string) bool {
 		return strings.TrimSpace(category) == category
 	case sourceHuangju:
 		return category == huangjuNewestCategory || validHuangjuID(category) && !strings.HasPrefix(category, "@")
+	case sourceXjai1:
+		return validXjai1Category(category)
 	}
 	if isDuanjuProviderSource(source) {
 		return validDuanjuCategory(source, category)
@@ -84,6 +86,8 @@ func (engine *nativeEngine) nativeCategories(ctx context.Context, source string,
 		return append(all, nativeAICategories...), nil
 	case sourceHuangdou:
 		return all, nil
+	case sourceXjai1:
+		return append(all, nativeXjai1Categories...), nil
 	}
 	if isCustomMaccmsSource(source) {
 		// 自定义 maccms 站点：从首页导航实时提取分类；识别不到则仅展示"全部"。

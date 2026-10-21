@@ -111,7 +111,7 @@ func isHuangguoProviderSource(source string) bool {
 // 全程占着 nativeState 锁的情况下，任何快照查询都会自己锁自己致死锁。
 func isBuiltinProviderSource(source string) bool {
 	switch canonicalProviderSource(source) {
-	case sourceHuangguoAI, sourceHuangguoVideo, sourceHuangdou, sourceHongguo, sourceHuangju, sourceCloudFront:
+	case sourceHuangguoAI, sourceHuangguoVideo, sourceHuangdou, sourceHongguo, sourceHuangju, sourceCloudFront, sourceXjai1:
 		return true
 	default:
 		return false
@@ -130,6 +130,8 @@ func canonicalProviderSource(source string) string {
 		return sourceHongguo
 	case "huangju", "huangju.net", "api.huangju.net":
 		return sourceHuangju
+	case "xjai1", "xjai1.com", "www.xjai1.com":
+		return sourceXjai1
 	case "cloudfront":
 		return sourceCloudFront
 	default:

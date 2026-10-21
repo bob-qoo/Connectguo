@@ -35,6 +35,8 @@ func (d *Downloader) providerBaseURL(source string) string {
 		configured, fallback = d.cfg.HongguoURL, hongguoBaseURL
 	case sourceHuangju:
 		configured, fallback = d.cfg.HuangjuURL, huangjuBaseURL
+	case sourceXjai1:
+		fallback = xjai1BaseURL
 	default:
 		if spec, found := duanjuSourceSpecFor(source); found {
 			return d.duanjuBaseURL(spec.ID)
@@ -61,6 +63,8 @@ func providerSourceForURL(raw string) string {
 		return sourceHongguo
 	case host == "huangju.net" || host == "www.huangju.net" || host == "api.huangju.net":
 		return sourceHuangju
+	case host == "xjai1.com" || host == "www.xjai1.com":
+		return sourceXjai1
 	default:
 		return ""
 	}
@@ -147,6 +151,9 @@ func (d *Downloader) resolveProviderMedia(ctx context.Context, task Task) (provi
 			}
 			media.Referer = client.host + "/home"
 		}
+	}
+	if chapter.Source == sourceXjai1 {
+		return d.resolveXjai1Media(ctx, task)
 	}
 	if chapter.PageURL != "" && (chapter.Source == sourceHuangguoAI || chapter.Source == sourceHuangguoVideo) {
 		responses := &playbackResponseURLs{}
