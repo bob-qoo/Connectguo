@@ -671,7 +671,19 @@ func (engine *nativeEngine) nativeCatalog(ctx context.Context, input nativeInput
 	case sourceCloudFront:
 		items, result.HasMore, err = d.fetchLegacyCatalogCategoryPage(ctx, page, category)
 	case sourceXjai1:
-		items, result.HasMore, err = d.fetchXjai1CatalogPage(ctx, page, category)
+		// 免费内容会轮换，某页过滤后可能为 0：空页自动往后翻（最多 5 页），
+		// 直到拿到内容为止；返回的 Page 是实际取到内容的页，避免 UI 重复请求已扫过的空页。
+		fetchedPage := page
+		for attempt := 0; attempt < 5; attempt++ {
+			fetchedPage = page + attempt
+			items, result.HasMore, err = d.fetchXjai1CatalogPage(ctx, fetchedPage, category)
+			if err != nil || len(items) > 0 || !result.HasMore {
+				break
+			}
+		}
+		if err == nil {
+			result.Page = fetchedPage
+		}
 	default:
 		if isDuanjuProviderSource(source) {
 			items, result.HasMore, err = d.fetchDuanjuCatalogPage(ctx, source, page, category)
@@ -680,7 +692,7 @@ func (engine *nativeEngine) nativeCatalog(ctx context.Context, input nativeInput
 	if err != nil && len(items) == 0 {
 		return result, err
 	}
-	if len(items) == 0 && page == 1 && source != sourceHuangju && !isDuanjuProviderSource(source) {
+	if len(items) == 0 && page == 1 && source != sourceHuangju && source != sourceXjai1 && !isDuanjuProviderSource(source) {
 		return result, errors.New("站源暂未返回剧集，请稍后刷新")
 	}
 	if err != nil {

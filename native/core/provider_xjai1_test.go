@@ -1,6 +1,10 @@
 package core
 
 import (
+	"context"
+	"fmt"
+	"net/http"
+	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
@@ -126,8 +130,75 @@ func TestValidXjai1Category(t *testing.T) {
 	}
 }
 
-// 以下真站探针默认跳过，仅 XJAI1_LIVE=1 时跑：验证匿名建会话是否可行，
-// 即 App 是否无需访客 token 即可拿到 manifest_url。
+func xjai1TestServer(t *testing.T, freeOnPage int) *httptest.Server {
+	t.Helper()
+	coinCard := func(i int) string {
+		return fmt.Sprintf(`<article class="g-theater-catalog-card"><a href="/dramas/coin-%d"><img src="https://example.test/c.jpg"><span class="badge coin">金币</span><strong>金币剧%d</strong><small><span>更新至10集</span></small></a></article>`, i, i)
+	}
+	freeCard := `<article class="g-theater-catalog-card"><a href="/dramas/free-1"><img src="https://example.test/f.jpg"><span class="g-drama-charge-badge is-free is-cover">免费</span><strong>免费剧</strong><small><span>更新至5集</span></small></a></article>`
+	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		var page int
+		if _, err := fmt.Sscanf(r.URL.Path, "/theater/page/%d/", &page); err != nil || page < 1 {
+			w.WriteHeader(http.StatusNotFound)
+			return
+		}
+		var b strings.Builder
+		if page == freeOnPage {
+			b.WriteString(freeCard)
+		} else {
+			for i := 0; i < 42; i++ {
+				b.WriteString(coinCard(i))
+			}
+		}
+		w.Write([]byte(b.String()))
+	}))
+}
+
+// 回归：剧场第 1 页过滤后为 0 时，目录必须自动往后翻到有内容的那页，
+// 而不是报“站源暂未返回剧集”。
+func TestXjai1CatalogAutoAdvance(t *testing.T) {
+	upstream := xjai1TestServer(t, 2)
+	defer upstream.Close()
+	old := xjai1BaseURL
+	xjai1BaseURL = upstream.URL
+	defer func() { xjai1BaseURL = old }()
+	engine, err := newNativeEngine(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := engine.nativeCatalog(context.Background(), nativeInput{Source: sourceXjai1, Page: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Items) != 1 || result.Items[0].ID != "xjai1:free-1" || result.Items[0].Title != "免费剧" {
+		t.Fatalf("unexpected items: %+v", result.Items)
+	}
+	if result.Page != 2 {
+		t.Fatalf("want page 2 (first non-empty page), got %d", result.Page)
+	}
+}
+
+// 回归：连续多页都过滤为空时，目录也不应报错，只返回空结果。
+func TestXjai1CatalogAllEmptyNoError(t *testing.T) {
+	upstream := xjai1TestServer(t, -1)
+	defer upstream.Close()
+	old := xjai1BaseURL
+	xjai1BaseURL = upstream.URL
+	defer func() { xjai1BaseURL = old }()
+	engine, err := newNativeEngine(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := engine.nativeCatalog(context.Background(), nativeInput{Source: sourceXjai1, Page: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(result.Items) != 0 {
+		t.Fatalf("want 0 items, got %d", len(result.Items))
+	}
+}
+
+// 以下真站探针默认跳过，仅 XJAI1_LIVE=1 时跑。
 func xjai1Live(t *testing.T) {
 	t.Helper()
 	if os.Getenv("XJAI1_LIVE") == "" {

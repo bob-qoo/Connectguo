@@ -25,9 +25,10 @@ import (
 
 const sourceXjai1 = "xjai1"
 
-const xjai1BaseURL = "https://xjai1.com"
-
 const xjai1UserAgent = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"
+
+// var 而非 const：测试用 httptest 覆盖基址，验证空页自动往后翻。
+var xjai1BaseURL = "https://xjai1.com"
 
 var nativeXjai1Categories = []nativeCategory{
 	{ID: "mingxinghuanlian", Name: "明星换脸"},
