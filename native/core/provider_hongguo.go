@@ -134,6 +134,13 @@ func (d *Downloader) fetchHongguoChapters(ctx context.Context, sourceID string) 
 	if sourceID == "" {
 		return "", nil, fmt.Errorf("empty hongguo sourceID")
 	}
+	// 玩家 App 详情档处于「暂不可用」负缓存窗口时，跳过这条 3 次重试+退避的慢链、
+	// 直走网页详情，提速详情页；窗口过期后自动恢复 App 优先。
+	if d.hongguoPlayerSuspended() {
+		if title, chapters, webErr := d.fetchHongguoWebChapters(ctx, sourceID); webErr == nil {
+			return title, chapters, nil
+		}
+	}
 	entry, appErr := d.hongguoAppDetail(ctx, sourceID)
 	if appErr == nil {
 		return entry.Drama.DisplayTitle(), append([]Chapter(nil), entry.Chapters...), nil

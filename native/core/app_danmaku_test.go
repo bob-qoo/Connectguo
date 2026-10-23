@@ -85,7 +85,12 @@ func TestHongguoDanmakuCacheAndConcurrentRequests(t *testing.T) {
 	d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
 		count := calls.Add(1)
 		if request.URL.Path == "/novel/player/video_detail/v1/" {
-			if request.Header.Get("X-Argus") != "" || request.Header.Get("X-Ladon") != "" || request.Header.Get("Comment-Source") != "" {
+			// 上游 2026-10-21 修复后，播放请求本身也要带 Argus/Ladon 播放签名，
+			// 不再是弹幕（comment）专属；只要求不带 Comment-Source 等弹幕标记。
+			if request.Header.Get("X-Argus") == "" || request.Header.Get("X-Ladon") == "" {
+				t.Error("player request missing Argus/Ladon signature")
+			}
+			if request.Header.Get("Comment-Source") != "" {
 				t.Error("comment signatures leaked into the regular player request")
 			}
 			return rankingHTTPResponse(request, 200, `{"code":0}`), nil
